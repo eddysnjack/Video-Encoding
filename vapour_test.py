@@ -1,10 +1,11 @@
 # Everything missing for macOS install on the documents can be found here:
 # https://forum.doom9.org/showthread.php?t=175522
 import os.path
-from vapoursynth import core
+from vapoursynth import core as vpCore, VideoNode as vpClip
 import configparser
 import subprocess
 import shutil
+import CustomClipFunctions
 
 
 # =======================================================================
@@ -62,22 +63,16 @@ def getConfig(section=None):
     return parser
 
 
-def getClip(filePath):
-    clip = core.lsmas.LWLibavSource(filePath)
-    clip_fps = 23.976
-    minute_long_fps = 60 * clip_fps
-    second_range = [*range(0, int(clip_fps))]
-    # http://www.vapoursynth.com/doc/functions/video/selectevery.html#selectevery
-    clip = core.std.SelectEvery(clip=clip, cycle=minute_long_fps, offsets=second_range, modify_duration=False)
-    # clip.set_output() #VSEdit needs this, otherwise it would not run
-    return clip
+def getClip(filePath) -> vpClip:
+    return CustomClipFunctions.SelectEverySecondFromEachMinute(filePath)
 
 
 def mainFunc():
     generalConfig = getConfig("General")
     inputFilePath = generalConfig.get("inputFilePath")
     clip = getClip(inputFilePath)
-    startEncoding(clip, os.path.join(generalConfig.get("outputFolder"), "out_file.mp4"))
+    print(clip)
+    # startEncoding(clip, os.path.join(generalConfig.get("outputFolder"), "out_file.mp4"))
 
 
 if __name__ == '__main__':
