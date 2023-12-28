@@ -71,8 +71,7 @@ def mainFunc():
     generalConfig = getConfig("General")
     inputFilePath = generalConfig.get("inputFilePath")
     clip = getClip(inputFilePath)
-    print(clip)
-    # startEncoding(clip, os.path.join(generalConfig.get("outputFolder"), "out_file.mp4"))
+    startEncoding(clip, os.path.join(generalConfig.get("outputFolder"), "out_file.mp4"))
 
 
 if __name__ == '__main__':
