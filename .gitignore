@@ -326,5 +326,5 @@ pyrightconfig.json
 .idea/*
 OutputFolder/*
 config.data
-vapour_test.vpy
+vapour_tests/vapour_test.vpy
 

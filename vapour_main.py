@@ -1,15 +1,22 @@
 # Everything missing for macOS install on the documents can be found here:
 # https://forum.doom9.org/showthread.php?t=175522
+import errno
 import os.path
+import sys
+
+import vapoursynth
 from vapoursynth import core as vpCore, VideoNode as vpClip
 import configparser
 import subprocess
 import shutil
 import CustomClipFunctions
+import Helper
+from pathlib import Path
+from view.view import Preview as vpPreview
 
 
 # =======================================================================
-#                       ENCODE PART
+#                               ENCODE PART
 # =======================================================================
 def updateFunction(currentFrame, totalFrames):
     print(currentFrame, totalFrames)
@@ -24,9 +31,8 @@ def startEncoding(clip, outFilePath):
                   "-crf", "23",
                   "-preset", "fast",
                   outFilePath]
-    process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stdout=sys.stdout, stderr=subprocess.STDOUT)
     clip.output(process.stdin, y4m=True, progress_update=updateFunction)
-    process.communicate()
 
     # # https://forum.videohelp.com/threads/392480-Easy-way-to-encode-vpy-scripts
     # # https://gist.github.com/rlaphoenix/8cc734e08f765490d9cc48f2f3006e22
@@ -64,14 +70,18 @@ def getConfig(section=None):
 
 
 def getClip(filePath) -> vpClip:
-    return CustomClipFunctions.SelectEverySecondFromEachMinute(filePath)
+    return CustomClipFunctions.SelectEverySecondFromEachMinute(filePath, (0, 0, 104, 104))
 
 
 def mainFunc():
     generalConfig = getConfig("General")
     inputFilePath = generalConfig.get("inputFilePath")
     clip = getClip(inputFilePath)
-    startEncoding(clip, os.path.join(generalConfig.get("outputFolder"), "out_file.mp4"))
+    clip = CustomClipFunctions.ShowTime(clip)
+    outFilePath = os.path.join(generalConfig.get("outputFolder"), "out_file.mp4")
+    safeOutFilePath = Helper.getNextNumberedFilePath(Path(outFilePath))
+    startEncoding(clip[500:600], safeOutFilePath)
+    # vpPreview(clip)
 
 
 if __name__ == '__main__':
