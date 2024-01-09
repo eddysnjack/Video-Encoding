@@ -1,3 +1,4 @@
+import math
 import os.path
 from datetime import timedelta
 from pathlib import Path
@@ -46,3 +47,17 @@ def seconds_to_hh_mm_ss_milis(time_in_seconds):
     formatted_time = "{:02}:{:02}:{:02}.{:03}".format(hours, minutes, seconds, milis)
 
     return formatted_time
+
+
+# ---------------------------------------------
+#                   ARRAY
+# ---------------------------------------------
+def selectEvenly(chunks: int, arrayLength) -> []:
+    arrCutEnds = arrayLength - 2  # think like: "arrIn[1:-1]" we want first and last pieces. so we remove them and do calculations accordingly.
+    partLength = arrCutEnds / (chunks - 1)
+    selectedIndexes = [0]
+    for i in range(1, (chunks - 1)):
+        indexRounded = math.ceil(i * partLength)  # ceil floor and round. ceil it is. just trial and error.
+        selectedIndexes.append(indexRounded)
+    selectedIndexes.append(arrayLength - 1)
+    return selectedIndexes

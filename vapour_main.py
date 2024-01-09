@@ -70,17 +70,20 @@ def getConfig(section=None):
 
 
 def getClip(filePath) -> vpClip:
-    return CustomClipFunctions.SelectEverySecondFromEachMinute(filePath, (0, 0, 104, 104))
+    return CustomClipFunctions.selectEverySecondFromEachMinute(filePath, (0, 0, 104, 104))
 
 
 def mainFunc():
     generalConfig = getConfig("General")
-    inputFilePath = generalConfig.get("inputFilePath")
-    clip = getClip(inputFilePath)
-    clip = CustomClipFunctions.ShowTime(clip)
-    outFilePath = os.path.join(generalConfig.get("outputFolder"), "out_file.mp4")
+    inputFilePathInstance = Path(generalConfig.get("inputFilePath"))
+    outFolderPath = generalConfig.get("outputFolder")
+    clip = CustomClipFunctions.getClipLSmash(inputFilePathInstance)
+    outFilePath = os.path.join(outFolderPath, "out_file.mp4")
     safeOutFilePath = Helper.getNextNumberedFilePath(Path(outFilePath))
-    startEncoding(clip[500:600], safeOutFilePath)
+    clip = CustomClipFunctions.printCustomInfoToFrames(clip, 7, inputFilePathInstance.name)
+    clip = CustomClipFunctions.splitAndSelect(clip, 20)
+    CustomClipFunctions.writeClipToPngFiles(clip, outFolderPath, imageNamePrefix=inputFilePathInstance.name)
+    # startEncoding(clip, safeOutFilePath)
     # vpPreview(clip)
 
 

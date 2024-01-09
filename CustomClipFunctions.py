@@ -1,4 +1,5 @@
 import functools
+import math
 import os
 import vapoursynth as vpSynth
 
@@ -17,7 +18,20 @@ def getClipLSmash(filePath, crop: tuple = None) -> vpSynth.VideoNode:
     return clip
 
 
-def SelectEverySecondFromEachMinute(filePath, crop: tuple = None) -> vpSynth.VideoNode:
+def splitAndSelect(clip: vpSynth.VideoNode, chunkCount: int) -> vpSynth.VideoNode:
+    if len(clip) < chunkCount:
+        return clip
+    indexes = Helper.selectEvenly(chunkCount, len(clip))
+    resultClip: vpSynth.VideoNode = None
+    for i in range(0, len(indexes)):
+        if resultClip is not None:
+            resultClip += clip[indexes[i]]
+        else:
+            resultClip = clip[indexes[i]]
+    return resultClip
+
+
+def selectEverySecondFromEachMinute(filePath, crop: tuple = None) -> vpSynth.VideoNode:
     """
     This function select 1 second long clips from each minute long of chunks from the video file
     and return the combination of those clips.
@@ -27,17 +41,17 @@ def SelectEverySecondFromEachMinute(filePath, crop: tuple = None) -> vpSynth.Vid
     :return: vapoursynth.VideoNode object
     """
     clip = vpSynth.core.lsmas.LWLibavSource(filePath)
-    clip_fps_rounded = round(getFpsValue(clip))
+    clip_fps_rounded = round(getFpsValueUpTo3DecimalPoint(clip))
     minute_long_fps_rounded = round(60 * clip_fps_rounded)
-    second_range = [*range(0, int(clip_fps_rounded))]
+    one_second_range = [*range(0, int(clip_fps_rounded))]
     # http://www.vapoursynth.com/doc/functions/video/selectevery.html#selectevery
-    clip = vpSynth.core.std.SelectEvery(clip=clip, cycle=minute_long_fps_rounded, offsets=second_range, modify_duration=False)
+    clip = vpSynth.core.std.SelectEvery(clip=clip, cycle=minute_long_fps_rounded, offsets=one_second_range, modify_duration=False)
     if crop is not None:
         clip = vpSynth.core.std.Crop(clip, left=crop[0], right=crop[1], top=crop[2], bottom=crop[3])
     return clip
 
 
-def getFpsValue(clip: vpSynth.VideoNode) -> int:
+def getFpsValueUpTo3DecimalPoint(clip: vpSynth.VideoNode) -> int:
     """
     https://www.vapoursynth.com/doc/pythonreference.html#VideoNode.fps
     :param clip:
@@ -47,7 +61,7 @@ def getFpsValue(clip: vpSynth.VideoNode) -> int:
 
 
 # TIME STAMP STUFF
-def ShowTime(clip, font_size=20, x=10, y=10, color="white"):
+def showTime(clip, font_size=20, x=10, y=10, color="white", alignMent=7):
     """
     Show the current time on the video clip.
 
@@ -61,13 +75,53 @@ def ShowTime(clip, font_size=20, x=10, y=10, color="white"):
     A new video clip with the current time displayed.
     """
 
-    def update_time(n, clip):
-        frame = clip.get_frame(n)
+    def update_time(n, inner_clip, inner_alignment):
+        frame = inner_clip.get_frame(n)
         frameTimeLength = frame.props["_DurationNum"] / frame.props["_DurationDen"]
         secondsPassed = n * frameTimeLength
-        return vpSynth.core.text.Text(clip[n], Helper.seconds_to_hh_mm_ss_milis(secondsPassed))
+        return vpSynth.core.text.Text(inner_clip[n], Helper.seconds_to_hh_mm_ss_milis(secondsPassed), alignment=inner_alignment)
 
-    return vpSynth.core.std.FrameEval(clip, functools.partial(update_time, clip=clip))
+    return vpSynth.core.std.FrameEval(clip, functools.partial(update_time, inner_clip=clip, inner_alignment=alignMent))
+
+
+def showFrameNumb(clip: vpSynth.VideoNode, alignMent=7):
+    def updateFrame(n, inner_clip, inner_alignment):
+        return vpSynth.core.text.Text(inner_clip[n], n, alignment=inner_alignment)
+
+    return vpSynth.core.std.FrameEval(clip, functools.partial(updateFrame, inner_clip=clip, inner_alignment=alignMent))
+
+
+def printTimeAndFrameNumber(clip: vpSynth.VideoNode, alignment=7, customClipName=""):
+    def updateFrame(n, inner_clip, inner_alignment, inner_customClipName):
+        frame = inner_clip.get_frame(n)
+        frameTimeLength = frame.props["_DurationNum"] / frame.props["_DurationDen"]
+        secondsPassed = n * frameTimeLength
+        timeStamp = Helper.seconds_to_hh_mm_ss_milis(secondsPassed)
+        frameLabel = f"{timeStamp}\n{n}" if inner_customClipName == "" else f"{inner_customClipName}\n{timeStamp}\n{n}"
+        return vpSynth.core.text.Text(inner_clip[n], frameLabel, alignment=inner_alignment)
+
+    return vpSynth.core.std.FrameEval(clip, functools.partial(updateFrame, inner_clip=clip, inner_alignment=alignment, inner_customClipName=customClipName))
+
+
+def printCustomInfoToFrames(clip: vpSynth.VideoNode, alignment=7, customClipName=""):
+    def updateFrame(n, inner_clip, inner_alignment, inner_customClipName):
+        frame = inner_clip.get_frame(n)
+        frameTimeLength = frame.props["_DurationNum"] / frame.props["_DurationDen"]
+        secondsPassed = n * frameTimeLength
+        timeStamp = Helper.seconds_to_hh_mm_ss_milis(secondsPassed)
+        frameLabel = prettyPrintInfo(timeStamp, n, f"{frame.width}x{frame.height}", inner_customClipName)
+        return vpSynth.core.text.Text(inner_clip[n], frameLabel, alignment=inner_alignment)
+
+    return vpSynth.core.std.FrameEval(clip, functools.partial(updateFrame, inner_clip=clip, inner_alignment=alignment, inner_customClipName=customClipName))
+
+
+def prettyPrintInfo(timeStamp: str, frameCount: int, resolution: str, fileName: str = ""):
+    frameLabel = "-"
+    if fileName == "":
+        frameLabel = f"{timeStamp}\n{resolution}\n{frameCount}"
+    else:
+        frameLabel = f"{fileName}\n{resolution}\n{timeStamp}\n{frameCount}"
+    return frameLabel
 
 
 def writeClipToNull(clip: vpSynth.VideoNode):
@@ -86,9 +140,17 @@ def writeClipToNull(clip: vpSynth.VideoNode):
     clip.output(f)
 
 
-def writeClipToPngFiles(clip, outFolderPath):
-    outFilePath = os.path.join(outFolderPath, "image%06d.png")
-    clip = vpSynth.core.resize.Bicubic(clip, format=vpSynth.RGB24)
+def writeClipToPngFiles(clip: vpSynth.VideoNode, outFolderPath, imageNamePrefix="image"):
+    outFilePath = os.path.join(outFolderPath, f"{imageNamePrefix}%06d.png")
+    # https://www.vapoursynth.com/doc/functions/video/resize.html
+    # bkz: Resize error 3074: no path between colorspaces (2/2/2 => 1/1/1). May need to specify additional colorspace parameters.
+    # matrix bilgisi ise frame içerisindeymiş. kodu incelemem gerekti.
+    # https://github.com/vapoursynth/vapoursynth/blob/9a489169f8c77b5c2b30733794beac9bf3274c25/src/core/textfilter.cpp#L552
+    # https://www.vapoursynth.com/doc/apireference.html#reserved-frame-properties
+    if clip.get_frame(0).props["_Matrix"] == vpSynth.MATRIX_UNSPECIFIED:
+        clip = vpSynth.core.resize.Bicubic(clip, format=vpSynth.RGB24, matrix_in=vpSynth.MATRIX_BT709)
+    else:
+        clip = vpSynth.core.resize.Bicubic(clip, format=vpSynth.RGB24)
     imageWRIResponse = vpSynth.core.imwri.Write(clip, 'PNG64', str(outFilePath))
     writeClipToNull(imageWRIResponse)
 
